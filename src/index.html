@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>GPING</title>
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div class="menu-bar">
+    <span>File</span>
+    <span>Settings</span>
+    <span>Help</span>
+  </div>
+  <div class="container">
+    <div class="nodes-section">
+      <div class="section-title">Nodes</div>
+      <table class="nodes-table">
+        <thead>
+          <tr>
+            <th>IP address</th>
+            <th>Hostname</th>
+            <th>RTT [ms]</th>
+            <th>Lost %</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="nodes-tbody">
+          <!-- Rows will be added dynamically -->
+        </tbody>
+      </table>
+      <div class="nodes-buttons">
+        <button id="add-host-btn">Add host</button>
+        <button id="import-btn">Import</button>
+        <button id="clear-btn">Clear</button>
+      </div>
+    </div>
+    <div class="control-panel">
+      <label for="interval-select">Control Panel</label>
+      <select id="interval-select">
+        <option>5 minutes</option>
+        <option>10 minutes</option>
+        <option>30 minutes</option>
+        <option>1 hour</option>
+      </select>
+      <button title="Start/Stop"><span>⏯️</span></button>
+      <button title="Export"><span>💾</span></button>
+      <button title="Chart"><span>📊</span></button>
+      <button title="Settings"><span>⚙️</span></button>
+    </div>
+    <div class="log-section">
+      <div class="section-title">Log</div>
+      <textarea id="log-area" readonly></textarea>
+    </div>
+  </div>
+  <div id="host-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span id="close-modal" class="close">&times;</span>
+      <label for="host-input">Enter IP address or hostname:</label>
+      <input type="text" id="host-input" />
+      <button id="modal-add-btn">Add</button>
+    </div>
+  </div>
+  <div id="graph-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="min-width:400px;min-height:300px;">
+      <span id="close-graph-modal" class="close">&times;</span>
+      <h3>RTT Graph</h3>
+      <canvas id="graph-canvas" width="360" height="220"></canvas>
+    </div>
+  </div>
+  <div id="details-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="min-width:500px;min-height:340px;">
+      <span id="close-details-modal" class="close">&times;</span>
+      <h3 id="details-title">Node Details</h3>
+      <canvas id="details-canvas" width="440" height="270"></canvas>
+      <div id="details-stats" style="margin-top:10px;font-size:14px;"></div>
+    </div>
+  </div>
+  <script src="index.js"></script>
+</body>
+</html>
