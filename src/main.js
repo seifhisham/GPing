@@ -17,6 +17,7 @@ function createWindow() {
     title: 'GPING',
   });
 
+  win.setMenuBarVisibility(false);
   win.loadFile('src/index.html');
 }
 
@@ -50,4 +51,8 @@ ipcMain.handle('ping-host', async (event, host) => {
       error: e.message,
     };
   }
+});
+
+ipcMain.handle('exit-app', () => {
+  app.quit();
 }); 

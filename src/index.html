@@ -7,9 +7,9 @@
 </head>
 <body>
   <div class="menu-bar">
-    <span>File</span>
-    <span>Settings</span>
-    <span>Help</span>
+    <span id="menu-file" class="menu-item">File</span>
+    <span id="menu-settings" class="menu-item">Settings</span>
+    <span id="menu-help" class="menu-item">Help</span>
   </div>
   <div class="container">
     <div class="nodes-section">
@@ -73,6 +73,19 @@
       <h3 id="details-title">Node Details</h3>
       <canvas id="details-canvas" width="440" height="270"></canvas>
       <div id="details-stats" style="margin-top:10px;font-size:14px;"></div>
+    </div>
+  </div>
+  <div id="about-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="min-width:340px;max-width:400px;">
+      <span id="close-about-modal" class="close">&times;</span>
+      <h3>About GPING</h3>
+      <div style="margin:10px 0 0 0;font-size:15px;">
+        <b>GPING</b> - Graphical Ping Utility<br/>
+        Version 1.0<br/>
+        <br/>
+        Created with Electron.<br/>
+        <a href="https://github.com/" target="_blank">GitHub</a>
+      </div>
     </div>
   </div>
   <script src="index.js"></script>

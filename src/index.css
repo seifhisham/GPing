@@ -11,6 +11,15 @@ body {
   border-bottom: 1px solid #ccc;
   font-size: 15px;
 }
+.menu-bar .menu-item {
+  cursor: pointer;
+  padding: 0 12px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.menu-bar .menu-item:hover {
+  background: #e6eaf0;
+}
 .container {
   padding: 16px;
 }
@@ -164,4 +173,7 @@ body {
 }
 .selected-row {
   background: #d0eaff !important;
+}
+#about-modal .modal-content {
+  text-align: left;
 }

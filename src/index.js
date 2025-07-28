@@ -33,6 +33,29 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedRow = null;
   let selectedHostObj = null;
 
+  const intervalSelect = document.getElementById('interval-select');
+  let pingIntervalMs = 5 * 60 * 1000; // Default to 5 minutes
+
+  // Update ping interval when dropdown changes
+  intervalSelect.addEventListener('change', () => {
+    const value = intervalSelect.value;
+    if (value.includes('minute')) {
+      pingIntervalMs = parseInt(value) * 60 * 1000;
+    } else if (value.includes('hour')) {
+      pingIntervalMs = parseInt(value) * 60 * 60 * 1000;
+    } else {
+      pingIntervalMs = 60 * 1000;
+    }
+    // Restart ping loops for all hosts
+    hosts.forEach(h => {
+      if (!h.paused) {
+        h.pingLoopRunning = false;
+        startPingingHost(h.host, h.row, h);
+      }
+    });
+    log(`Ping interval set to ${intervalSelect.value}.`);
+  });
+
   function log(message) {
     const now = new Date().toLocaleTimeString();
     logArea.value += `[${now}] ${message}\n`;
@@ -373,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillText('0', 2, 210);
   }
 
-  // Ping logic (update to support pause/resume)
+  // Ping logic (update to use pingIntervalMs)
   function startPingingHost(host, row, hostObj) {
     if (!hostObj) return;
     if (hostObj.pingLoopRunning) return;
@@ -399,8 +422,92 @@ document.addEventListener('DOMContentLoaded', () => {
         hostObj.sent = sent;
         hostObj.lost = lost;
       }
-      setTimeout(pingLoop, 1000);
+      setTimeout(pingLoop, pingIntervalMs);
     }
     pingLoop();
   }
+
+  // Menu bar actions
+  document.getElementById('menu-file').addEventListener('click', (e) => {
+    // Simple dropdown simulation
+    const menu = document.createElement('div');
+    menu.className = 'menu-dropdown';
+    menu.style.position = 'absolute';
+    menu.style.top = '32px';
+    menu.style.left = e.target.getBoundingClientRect().left + 'px';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid #b0c4de';
+    menu.style.borderRadius = '6px';
+    menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+    menu.style.zIndex = 2000;
+    menu.innerHTML = `
+      <div class='menu-dropdown-item' id='file-import'>Import Hosts</div>
+      <div class='menu-dropdown-item' id='file-export'>Export Hosts</div>
+      <div class='menu-dropdown-item' id='file-exit'>Exit</div>
+    `;
+    document.body.appendChild(menu);
+    // Remove on click outside
+    setTimeout(() => {
+      window.addEventListener('click', function handler(ev) {
+        if (!menu.contains(ev.target)) {
+          menu.remove();
+          window.removeEventListener('click', handler);
+        }
+      });
+    }, 10);
+    // Actions
+    menu.querySelector('#file-import').onclick = () => { importBtn.click(); menu.remove(); };
+    menu.querySelector('#file-export').onclick = () => { if (exportBtn) exportBtn.click(); menu.remove(); };
+    menu.querySelector('#file-exit').onclick = () => { if (window.api && window.api.exitApp) window.api.exitApp(); else window.close(); menu.remove(); };
+  });
+  document.getElementById('menu-settings').addEventListener('click', (e) => {
+    const menu = document.createElement('div');
+    menu.className = 'menu-dropdown';
+    menu.style.position = 'absolute';
+    menu.style.top = '32px';
+    menu.style.left = e.target.getBoundingClientRect().left + 'px';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid #b0c4de';
+    menu.style.borderRadius = '6px';
+    menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+    menu.style.zIndex = 2000;
+    menu.innerHTML = `<div class='menu-dropdown-item' id='settings-clear'>Clear All Hosts</div>`;
+    document.body.appendChild(menu);
+    setTimeout(() => {
+      window.addEventListener('click', function handler(ev) {
+        if (!menu.contains(ev.target)) {
+          menu.remove();
+          window.removeEventListener('click', handler);
+        }
+      });
+    }, 10);
+    menu.querySelector('#settings-clear').onclick = () => { clearBtn.click(); menu.remove(); };
+  });
+  document.getElementById('menu-help').addEventListener('click', (e) => {
+    const menu = document.createElement('div');
+    menu.className = 'menu-dropdown';
+    menu.style.position = 'absolute';
+    menu.style.top = '32px';
+    menu.style.left = e.target.getBoundingClientRect().left + 'px';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid #b0c4de';
+    menu.style.borderRadius = '6px';
+    menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+    menu.style.zIndex = 2000;
+    menu.innerHTML = `<div class='menu-dropdown-item' id='help-about'>About</div>`;
+    document.body.appendChild(menu);
+    setTimeout(() => {
+      window.addEventListener('click', function handler(ev) {
+        if (!menu.contains(ev.target)) {
+          menu.remove();
+          window.removeEventListener('click', handler);
+        }
+      });
+    }, 10);
+    menu.querySelector('#help-about').onclick = () => { document.getElementById('about-modal').style.display = 'flex'; menu.remove(); };
+  });
+  // About modal close
+  document.getElementById('close-about-modal').onclick = () => {
+    document.getElementById('about-modal').style.display = 'none';
+  };
 });
