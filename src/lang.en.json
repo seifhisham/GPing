@@ -1,0 +1,40 @@
+{
+  "menu": {
+    "file": "File",
+    "settings": "Settings",
+    "help": "Help",
+    "import": "Import Hosts",
+    "export": "Export Hosts",
+    "exit": "Exit",
+    "clear": "Clear All Hosts",
+    "about": "About"
+  },
+  "about": {
+    "title": "About GPING",
+    "desc": "<b>GPING</b> - Graphical Ping Utility<br/>Version 1.0<br/><br/>Created with Electron.<br/><a href=\"https://github.com/\" target=\"_blank\">GitHub</a>"
+  },
+  "nodes": {
+    "section": "Nodes",
+    "add": "Add host",
+    "import": "Import",
+    "clear": "Clear",
+    "ip": "IP address",
+    "hostname": "Hostname",
+    "rtt": "RTT [ms]",
+    "lost": "Lost %",
+    "remove": "Remove",
+    "details": "Details"
+  },
+  "control": {
+    "panel": "Control Panel",
+    "start": "⏯️",
+    "export": "💾",
+    "chart": "📊",
+    "settings": "⚙️"
+  },
+  "log": "Log",
+  "modals": {
+    "add_host": "Enter IP address or hostname:",
+    "add": "Add"
+  }
+} 

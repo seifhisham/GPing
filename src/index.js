@@ -460,6 +460,55 @@ document.addEventListener('DOMContentLoaded', () => {
     menu.querySelector('#file-export').onclick = () => { if (exportBtn) exportBtn.click(); menu.remove(); };
     menu.querySelector('#file-exit').onclick = () => { if (window.api && window.api.exitApp) window.api.exitApp(); else window.close(); menu.remove(); };
   });
+  // --- Language Switcher ---
+  let currentLang = localStorage.getItem('gping-lang') || 'en';
+  let langData = null;
+
+  async function loadLang(lang) {
+    const res = await fetch(`lang.${lang}.json`);
+    langData = await res.json();
+    applyLang();
+    document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+    localStorage.setItem('gping-lang', lang);
+  }
+
+  function applyLang() {
+    if (!langData) return;
+    // Menu bar
+    document.getElementById('menu-file').textContent = langData.menu.file;
+    document.getElementById('menu-settings').textContent = langData.menu.settings;
+    document.getElementById('menu-help').textContent = langData.menu.help;
+    // Nodes section
+    document.querySelector('.section-title').textContent = langData.nodes.section;
+    document.getElementById('add-host-btn').textContent = langData.nodes.add;
+    document.getElementById('import-btn').textContent = langData.nodes.import;
+    document.getElementById('clear-btn').textContent = langData.nodes.clear;
+    // Table headers
+    const ths = document.querySelectorAll('.nodes-table th');
+    if (ths.length >= 5) {
+      ths[0].textContent = langData.nodes.ip;
+      ths[1].textContent = langData.nodes.hostname;
+      ths[2].textContent = langData.nodes.rtt;
+      ths[3].textContent = langData.nodes.lost;
+      ths[4].textContent = '';
+    }
+    // Control panel
+    document.querySelector('.control-panel label').textContent = langData.control.panel;
+    // Log section
+    document.querySelector('.log-section .section-title').textContent = langData.log;
+    // Add host modal
+    document.getElementById('host-input').placeholder = langData.modals.add_host;
+    document.getElementById('modal-add-btn').textContent = langData.modals.add;
+    // About modal
+    document.getElementById('details-title').textContent = langData.about.title;
+    document.getElementById('about-modal').querySelector('h3').textContent = langData.about.title;
+    document.getElementById('about-modal').querySelector('div[style*="font-size:15px"]').innerHTML = langData.about.desc;
+    // Update all remove/details buttons
+    document.querySelectorAll('.remove-btn').forEach(btn => btn.textContent = langData.nodes.remove);
+    document.querySelectorAll('.details-btn').forEach(btn => btn.textContent = langData.nodes.details);
+  }
+
+  // Add language submenu to Settings
   document.getElementById('menu-settings').addEventListener('click', (e) => {
     const menu = document.createElement('div');
     menu.className = 'menu-dropdown';
@@ -471,7 +520,11 @@ document.addEventListener('DOMContentLoaded', () => {
     menu.style.borderRadius = '6px';
     menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
     menu.style.zIndex = 2000;
-    menu.innerHTML = `<div class='menu-dropdown-item' id='settings-clear'>Clear All Hosts</div>`;
+    menu.innerHTML = `
+      <div class='menu-dropdown-item' id='settings-clear'>${langData.menu.clear}</div>
+      <div class='menu-dropdown-item' id='settings-lang-en'>English</div>
+      <div class='menu-dropdown-item' id='settings-lang-ar'>العربية</div>
+    `;
     document.body.appendChild(menu);
     setTimeout(() => {
       window.addEventListener('click', function handler(ev) {
@@ -482,7 +535,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }, 10);
     menu.querySelector('#settings-clear').onclick = () => { clearBtn.click(); menu.remove(); };
+    menu.querySelector('#settings-lang-en').onclick = () => { loadLang('en'); menu.remove(); };
+    menu.querySelector('#settings-lang-ar').onclick = () => { loadLang('ar'); menu.remove(); };
   });
+
+  // Initial language load
+  loadLang(currentLang);
   document.getElementById('menu-help').addEventListener('click', (e) => {
     const menu = document.createElement('div');
     menu.className = 'menu-dropdown';
