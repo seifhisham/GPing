@@ -1,5 +1,3 @@
-require('electron-reload')(__dirname);
-
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const ping = require('ping');
@@ -55,4 +53,26 @@ ipcMain.handle('ping-host', async (event, host) => {
 
 ipcMain.handle('exit-app', () => {
   app.quit();
+});
+
+ipcMain.handle('resolve-dns', async (event, hostname) => {
+  console.log(`DNS resolution requested for: ${hostname}`);
+  try {
+    const dns = require('dns');
+    const { promisify } = require('util');
+    const resolve4 = promisify(dns.resolve4);
+    
+    const addresses = await resolve4(hostname);
+    console.log(`DNS resolution successful: ${hostname} -> ${addresses[0]}`);
+    return {
+      success: true,
+      ip: addresses[0]
+    };
+  } catch (error) {
+    console.log(`DNS resolution failed: ${hostname} - ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }); 

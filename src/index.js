@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hostModal = document.getElementById('host-modal');
   const closeModal = document.getElementById('close-modal');
   const hostInput = document.getElementById('host-input');
+  const resolveDnsCheckbox = document.getElementById('resolve-dns-checkbox');
   const modalAddBtn = document.getElementById('modal-add-btn');
 
   // Chart elements
@@ -34,26 +35,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedHostObj = null;
 
   const intervalSelect = document.getElementById('interval-select');
-  let pingIntervalMs = 5 * 60 * 1000; // Default to 5 minutes
+  let graphTimeRangeMs = 5 * 60 * 1000; // Default to 5 minutes for graph display
+  let pingIntervalMs = 1000; // Fixed ping interval of 1 second
 
-  // Update ping interval when dropdown changes
+  // Update graph time range when dropdown changes
   intervalSelect.addEventListener('change', () => {
     const value = intervalSelect.value;
     if (value.includes('minute')) {
-      pingIntervalMs = parseInt(value) * 60 * 1000;
+      graphTimeRangeMs = parseInt(value) * 60 * 1000;
     } else if (value.includes('hour')) {
-      pingIntervalMs = parseInt(value) * 60 * 60 * 1000;
+      graphTimeRangeMs = parseInt(value) * 60 * 60 * 1000;
     } else {
-      pingIntervalMs = 60 * 1000;
+      graphTimeRangeMs = 5 * 60 * 1000; // Default to 5 minutes
     }
-    // Restart ping loops for all hosts
-    hosts.forEach(h => {
-      if (!h.paused) {
-        h.pingLoopRunning = false;
-        startPingingHost(h.host, h.row, h);
-      }
-    });
-    log(`Ping interval set to ${intervalSelect.value}.`);
+    log(`Graph time range set to ${intervalSelect.value}.`);
   });
 
   function log(message) {
@@ -64,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   addHostBtn.addEventListener('click', () => {
     hostInput.value = '';
+    resolveDnsCheckbox.checked = false;
     hostModal.style.display = 'flex';
     hostInput.focus();
   });
@@ -72,12 +68,36 @@ document.addEventListener('DOMContentLoaded', () => {
     hostModal.style.display = 'none';
   });
 
-  modalAddBtn.addEventListener('click', () => {
+  modalAddBtn.addEventListener('click', async () => {
     const host = hostInput.value.trim();
     if (!host) return;
-    addHostRow(host);
+    
+    let resolvedHost = host;
+    log(`Checkbox checked: ${resolveDnsCheckbox.checked}`);
+    if (resolveDnsCheckbox.checked) {
+      log(`Attempting to resolve hostname: ${host}`);
+      try {
+        // Use IPC to resolve hostname to IP
+        const result = await window.api.resolveDns(host);
+        log(`DNS resolution result:`, result);
+        if (result.success) {
+          resolvedHost = result.ip;
+          log(`Successfully resolved ${host} to ${resolvedHost}`);
+        } else {
+          log(`Could not resolve hostname: ${host} - ${result.error}`);
+        }
+      } catch (error) {
+        log(`DNS resolution failed for ${host}: ${error.message}`);
+      }
+    } else {
+      log(`DNS resolution skipped for: ${host}`);
+    }
+    
+    log(`Final values - resolvedHost: ${resolvedHost}, originalHost: ${host}, checkboxChecked: ${resolveDnsCheckbox.checked}`);
+    const originalHostname = resolveDnsCheckbox.checked ? host : null;
+    addHostRow(resolvedHost, originalHostname);
     hostModal.style.display = 'none';
-    log(`Added host: ${host}`);
+    log(`Added host: ${resolvedHost}${resolveDnsCheckbox.checked ? ' (resolved from ' + host + ')' : ''}`);
   });
 
   window.addEventListener('click', (e) => {
@@ -202,17 +222,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Add a host row with remove and details buttons and ping logic
-  function addHostRow(host) {
+  function addHostRow(host, originalHostname = null) {
     const row = document.createElement('tr');
+    // If we have an original hostname (from DNS resolution), use it for display
+    // Otherwise, use the host value for both columns
+    const hostnameToDisplay = originalHostname || host;
+    log(`Adding host row - host: ${host}, originalHostname: ${originalHostname}, hostnameToDisplay: ${hostnameToDisplay}`);
     row.innerHTML = `
       <td>${host}</td>
-      <td></td>
+      <td>${hostnameToDisplay}</td>
       <td></td>
       <td></td>
       <td><button class="remove-btn">Remove</button> <button class="details-btn">Details</button></td>
     `;
     nodesTbody.appendChild(row);
-    const hostObj = { host, row, pings: [], lost: 0, rtts: [], paused: false, pingLoopRunning: false, sent: 0, lostCount: 0 };
+    const hostObj = { 
+      host, 
+      originalHostname: originalHostname || host,
+      row, 
+      pings: [], 
+      lost: 0, 
+      rtts: [], 
+      timestamps: [], 
+      paused: false, 
+      pingLoopRunning: false, 
+      sent: 0, 
+      lostCount: 0 
+    };
     hosts.push(hostObj);
     startPingingHost(host, row, hostObj);
     // Remove button logic
@@ -220,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
       nodesTbody.removeChild(row);
       const idx = hosts.findIndex(h => h.row === row);
       if (idx !== -1) hosts.splice(idx, 1);
-      log(`Removed host: ${host}`);
+      log(`Removed host: ${hostObj.originalHostname}`);
       // Deselect if this was selected
       if (selectedRow === row) {
         selectedRow = null;
@@ -236,7 +272,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openDetailsModal(hostObj) {
     detailsModal.style.display = 'flex';
-    detailsTitle.textContent = `Round-Trip-Time (ms) - ${hostObj.host} - Last ${hostObj.rtts.length} samples`;
+    const timeRangeMinutes = Math.round(graphTimeRangeMs / 1000 / 60);
+    const displayName = hostObj.originalHostname !== hostObj.host ? 
+      `${hostObj.originalHostname} (${hostObj.host})` : hostObj.host;
+    detailsTitle.textContent = `Round-Trip-Time (ms) - ${displayName} - Last ${timeRangeMinutes} minutes`;
     drawDetailsGraph(hostObj);
     if (detailsInterval) clearInterval(detailsInterval);
     detailsInterval = setInterval(() => drawDetailsGraph(hostObj), 1000);
@@ -272,9 +311,22 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(60, 20); ctx.lineTo(60, 250); ctx.lineTo(430, 250); ctx.stroke();
     ctx.restore();
-    // Find min/max RTT
+    
+    // Filter data by time range
+    const now = Date.now();
+    const timeRangeMs = graphTimeRangeMs;
+    const filteredData = hostObj.rtts.map((rtt, index) => ({
+      rtt,
+      timestamp: hostObj.timestamps[index]
+    })).filter(data => {
+      // Keep only data points within the time range
+      return data.timestamp >= now - timeRangeMs;
+    });
+    const filteredRtts = filteredData.map(d => d.rtt);
+    
+    // Find min/max RTT from filtered data
     let min = Infinity, max = -Infinity, sum = 0, count = 0, cur = null;
-    hostObj.rtts.forEach(rtt => {
+    filteredRtts.forEach(rtt => {
       if (typeof rtt === 'number') {
         if (rtt < min) min = rtt;
         if (rtt > max) max = rtt;
@@ -294,9 +346,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     let started = false;
-    hostObj.rtts.forEach((rtt, i) => {
+    filteredRtts.forEach((rtt, i) => {
       if (typeof rtt !== 'number') return;
-      const x = 60 + (i * ((370) / (hostObj.rtts.length-1 || 1)));
+      const x = 60 + (i * ((370) / (filteredRtts.length-1 || 1)));
       const y = 250 - ((rtt - yMin) / (yMax - yMin)) * 210;
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
@@ -306,15 +358,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Draw points
     ctx.save();
     ctx.fillStyle = '#e41a1c';
-    hostObj.rtts.forEach((rtt, i) => {
+    filteredRtts.forEach((rtt, i) => {
       if (typeof rtt !== 'number') return;
-      const x = 60 + (i * ((370) / (hostObj.rtts.length-1 || 1)));
+      const x = 60 + (i * ((370) / (filteredRtts.length-1 || 1)));
       const y = 250 - ((rtt - yMin) / (yMax - yMin)) * 210;
       ctx.beginPath(); ctx.arc(x, y, 2.7, 0, 2*Math.PI); ctx.fill();
     });
     // Highlight current RTT
-    if (typeof cur === 'number') {
-      const x = 60 + ((hostObj.rtts.length-1) * ((370) / (hostObj.rtts.length-1 || 1)));
+    if (typeof cur === 'number' && filteredRtts.length > 0) {
+      const x = 60 + ((filteredRtts.length-1) * ((370) / (filteredRtts.length-1 || 1)));
       const y = 250 - ((cur - yMin) / (yMax - yMin)) * 210;
       ctx.beginPath(); ctx.arc(x, y, 5, 0, 2*Math.PI);
       ctx.fillStyle = '#fff'; ctx.fill();
@@ -329,12 +381,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillText(`${yMax} ms`, 10, 30);
     ctx.fillText(`${yMin} ms`, 10, 250);
     ctx.restore();
-    // X axis labels (show time index)
+    // X axis labels (show time range)
     ctx.save();
     ctx.fillStyle = '#2a3a4a';
     ctx.font = '13px Segoe UI, Arial, sans-serif';
     ctx.fillText('Now', 400, 255);
-    ctx.fillText(`-${hostObj.rtts.length-1 || 0}s`, 60, 255);
+    const timeRangeMinutes = Math.round(timeRangeMs / 1000 / 60);
+    ctx.fillText(`-${timeRangeMinutes}m`, 60, 255);
     ctx.restore();
     // Legend
     ctx.save();
@@ -350,7 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <b>Avg</b>: ${avg ? avg.toFixed(2) : '-'} ms &nbsp; 
       <b>Max</b>: ${max === -Infinity ? '-' : max.toFixed(2)} ms &nbsp; 
       <b>Cur</b>: ${cur !== null ? cur.toFixed(2) : '-'} ms<br/>
-      Packets: Sent = ${hostObj.sent || 0}, Received = ${(hostObj.sent||0)-(hostObj.lost||0)}, Lost = ${hostObj.lost||0}
+      Packets: Sent = ${hostObj.sent || 0}, Received = ${(hostObj.sent||0)-(hostObj.lost||0)}, Lost = ${hostObj.lost||0}<br/>
+      Time Range: ${timeRangeMinutes} minutes
     `;
   }
 
@@ -365,21 +419,40 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineTo(40, 210);
     ctx.lineTo(350, 210);
     ctx.stroke();
-    // Find max RTT
+    
+    // Calculate time range for data points
+    const now = Date.now();
+    const timeRangeMs = graphTimeRangeMs;
+    
+    // Find max RTT and filter data by time range
     let maxRTT = 100;
-    hosts.forEach(h => {
-      h.rtts.forEach(rtt => {
+    const filteredHosts = hosts.map(h => {
+      const filteredData = h.rtts.map((rtt, index) => ({
+        rtt,
+        timestamp: h.timestamps[index]
+      })).filter(data => {
+        // Keep only data points within the time range
+        return data.timestamp >= now - timeRangeMs;
+      });
+      return { ...h, filteredRtts: filteredData.map(d => d.rtt) };
+    });
+    
+    filteredHosts.forEach(h => {
+      h.filteredRtts.forEach(rtt => {
         if (typeof rtt === 'number' && rtt > maxRTT) maxRTT = rtt;
       });
     });
+    
     // Draw lines for each host
     const colors = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#a65628','#f781bf','#999999'];
-    hosts.forEach((h, i) => {
+    filteredHosts.forEach((h, i) => {
+      if (h.filteredRtts.length === 0) return;
+      
       ctx.strokeStyle = colors[i % colors.length];
       ctx.beginPath();
-      h.rtts.forEach((rtt, j) => {
+      h.filteredRtts.forEach((rtt, j) => {
         if (typeof rtt !== 'number') return;
-        const x = 40 + (j * ((310) / 29));
+        const x = 40 + (j * ((310) / (h.filteredRtts.length - 1 || 1)));
         const y = 210 - ((rtt / maxRTT) * 200);
         if (j === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
@@ -387,13 +460,17 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.stroke();
       // Host label
       ctx.fillStyle = colors[i % colors.length];
-      ctx.fillText(h.host, 50 + i*60, 225);
+      const displayName = h.originalHostname !== h.host ? h.originalHostname : h.host;
+      ctx.fillText(displayName, 50 + i*60, 225);
     });
     // Y axis labels
     ctx.fillStyle = '#222';
     ctx.fillText('RTT (ms)', 2, 20);
     ctx.fillText(maxRTT.toFixed(0), 2, 30);
     ctx.fillText('0', 2, 210);
+    
+    // X axis time label
+    ctx.fillText(`${Math.round(timeRangeMs / 1000 / 60)}m`, 320, 225);
   }
 
   // Ping logic (update to use pingIntervalMs)
@@ -414,11 +491,23 @@ document.addEventListener('DOMContentLoaded', () => {
       row.cells[1].textContent = res.host || '';
       row.cells[2].textContent = res.time !== null ? res.time : '-';
       row.cells[3].textContent = ((lost / sent) * 100).toFixed(0);
-      // Store RTT for graph
+      // Store RTT and timestamp for graph
       if (hostObj) {
-        if (typeof res.time === 'number') hostObj.rtts.push(res.time);
-        else hostObj.rtts.push(null);
-        if (hostObj.rtts.length > 30) hostObj.rtts.shift();
+        const timestamp = Date.now();
+        if (typeof res.time === 'number') {
+          hostObj.rtts.push(res.time);
+          hostObj.timestamps.push(timestamp);
+        } else {
+          hostObj.rtts.push(null);
+          hostObj.timestamps.push(timestamp);
+        }
+        // Keep only data within the maximum time range (1 hour)
+        const maxTimeRange = 60 * 60 * 1000; // 1 hour
+        while (hostObj.timestamps.length > 0 && 
+               timestamp - hostObj.timestamps[0] > maxTimeRange) {
+          hostObj.timestamps.shift();
+          hostObj.rtts.shift();
+        }
         hostObj.sent = sent;
         hostObj.lost = lost;
       }
